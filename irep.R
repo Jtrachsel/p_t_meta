@@ -54,20 +54,43 @@ group_compare <- look %>% filter(num_NA < 2) %>% filter(num_w_4p > 1)
 time_course <- look %>% filter(num_w_4p == 3)
 
 # treatments by day
+# only includes bins that have at least 2 treatments with 4+ observations
 dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
-  filter(bin_day %in% look$bin_day) %>% 
+  filter(bin_day %in% group_compare$bin_day) %>% 
   ggplot(aes(x=treatment, y=iRep)) + geom_boxplot() + facet_wrap(~day)
 
 # days by treatment
+# only includes bins with 4+ observations in all 3 treatments
 dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
   filter(bin_day %in% time_course$bin_day) %>% 
   ggplot(aes(x=day, y=iRep)) + geom_boxplot() + facet_wrap(~treatment)
 
 
 dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
-  filter(bin_day %in% look$bin_day) %>% select(genome) %>% unlist() %>% unique()
+  filter(bin_day %in% group_compare$bin_day) %>%
+  group_by(genome, day, treatment) %>% 
+  summarise(iRep=mean(iRep)) %>% 
+  ggplot(aes(x=day, y=iRep, group=genome, color=treatment)) + geom_point() + geom_line() + 
+  facet_wrap(~treatment)
 
  
+dat %>%
+  unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+  filter(bin_day %in% group_compare$bin_day) %>%
+  group_by(day, treatment, genome) %>%
+  summarise(mean_irep=mean(iRep)) %>% 
+  arrange(desc(mean_irep)) %>% 
+  ggplot(aes(y=genome, x=mean_irep, color=treatment)) + geom_point() + facet_wrap(~day)
+
+
+dat %>%
+  unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+  filter(bin_day %in% group_compare$bin_day) %>%
+  group_by(day, treatment, genome) %>%
+  summarise(mean_irep=mean(iRep)) %>% 
+  arrange(desc(mean_irep)) %>% 
+  filter(day =='07') %>% 
+  ggplot(aes(y=genome, x=mean_irep, color=treatment)) + geom_point()#+ facet_wrap(~day)
 
 #### need to start splitting these out by bin....
 
@@ -102,6 +125,8 @@ tests_treat <- nesty_dat %>%
   select(genome, tid_sum) %>% unnest(cols = c(tid_sum)) %>% 
   filter(term == 'treatment')
 
+
+tests_treat %>% select(genome)
 
 
 
