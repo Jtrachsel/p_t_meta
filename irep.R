@@ -25,7 +25,10 @@ dat <- read_tsv('ALL_RESULTS_BULK_MAP.txt', skip = 1, col_types = c('iccnnnnnnni
 # 3439 valid iRep values with 3x min cov... maybe should bump back up to 5
 # 3342 actually without the 'extra' samples
 
-dat5 <- dat %>% filter(coverage > 5)
+#dat5 <- dat %>% filter(coverage > 5)
+
+dat <- dat %>% filter(coverage > 5)
+
 dat %>% ggplot(aes(x=log2(coverage))) + geom_histogram(bins = 100)
 
 
@@ -77,10 +80,10 @@ look <- dat %>%
   
 #### These have at least 2 groups with 4+ observations
 two_groups <- look %>%  filter(num_w_4p > 1)  
-
+two_groups
 # these have all 3 groups represented by at least 4 data points each
 all_groups <- look %>% filter(num_w_4p == 3)
-
+all_groups
 # no bin has 4 or more observations in every group at every timepoint
 look %>% select(genome, day, num_w_4p) %>%
   spread(key = day, value = num_w_4p) %>% 
@@ -92,36 +95,37 @@ look %>% select(genome, day, num_w_4p) %>%
 
 ## one timepoint ##
 
-# 16 bins have all treatment groups represented with 4+ observations at D7
+# 8 bins have all treatment groups represented with 4+ observations at D7
 D7 <- all_groups %>%
   select(genome, day, num_w_4p) %>% 
   spread(key=day, value = num_w_4p) %>% 
   filter(!is.na(`07`))
+D7
 
-
-# 22 bins have all treatment groups represented with 4+ observations at D35
+# 11 bins have all treatment groups represented with 4+ observations at D35
 D35 <- all_groups %>%
   select(genome, day, num_w_4p) %>% 
   spread(key=day, value = num_w_4p) %>% 
   filter(!is.na(`35`))
+D35
 
-# 16 bins have all treatment groups represented with 4+ observations at D78
+# 8 bins have all treatment groups represented with 4+ observations at D78
 D78 <- all_groups %>%
   select(genome, day, num_w_4p) %>% 
   spread(key=day, value = num_w_4p) %>% 
   filter(!is.na(`78`))
-
+D78
 
 ### 2 timepoints ###
 
-# 10 bins have all 3 groups with 4+ observations at both d7 and d35
+# 4 bins have all 3 groups with 4+ observations at both d7 and d35
 all_groups %>%
   select(genome, day, num_w_4p) %>% 
   spread(key=day, value = num_w_4p) %>% 
   mutate(d7vd35 = `07` + `35`) %>% 
   filter(!is.na(d7vd35))
 
-# 2 bins have all 3 groups with 4+ observations at both d35 and d78
+# 1 bin has all 3 groups with 4+ observations at both d35 and d78
 all_groups %>%
   select(genome, day, num_w_4p) %>% 
   spread(key=day, value = num_w_4p) %>% 
@@ -134,7 +138,7 @@ all_groups %>%
 
 # these ones can compare d7 vs d35 in ctrl
 
-#
+# 15 bins
 ctrl735 <- look %>% 
 #  filter(num_w_4p >1) %>%
 #  filter(ctrl >3) %>%
@@ -143,7 +147,9 @@ ctrl735 <- look %>%
   unite(col='treat_day', treat, day) %>% spread(key=treat_day, value=count) %>% 
   select(genome, starts_with('ctrl')) %>% 
   filter(ctrl_07 > 3 & ctrl_35 > 3)
+ctrl735
 
+# 8 bins
 sub735 <- look %>% 
   #  filter(num_w_4p >1) %>%
   #  filter(ctrl >3) %>%
@@ -152,7 +158,9 @@ sub735 <- look %>%
   unite(col='treat_day', treat, day) %>% spread(key=treat_day, value=count) %>% 
   select(genome, starts_with('sub')) %>% 
   filter(sub_07 > 3 & sub_35 > 3)
+sub735
 
+# 11 bins
 ther735 <- look %>% 
   #  filter(num_w_4p >1) %>%
   #  filter(ctrl >3) %>%
@@ -161,28 +169,61 @@ ther735 <- look %>%
   unite(col='treat_day', treat, day) %>% spread(key=treat_day, value=count) %>% 
   select(genome, starts_with('ther')) %>% 
   filter(ther_07 > 3 & ther_35 > 3)
-
+ther735
 
 # ctrl735$genome
 
 # these bins can be used to compare growth rates in all 3 treatments at days 7 and 35
+#4 bins
 lmbins <- intersect(intersect(ctrl735$genome, sub735$genome), ther735$genome)
-
+lmbins
 
 
 
 
 d735_lms <- dat %>% filter(genome %in% lmbins & day %in%c('07','35')) %>% group_by(genome) %>% nest()
 
+d735_lms[4,1]
 test <- d735_lms[4,2][[1]][[1]]
 test %>% ggplot(aes(x=treatment, y=iRep)) + geom_boxplot() + facet_wrap(~day)
 
 
 summary(lm(data = test, formula = iRep ~ treatment*day_num))
+
+###########
+hmmm <- d735_lms %>%ungroup() %>% 
+  mutate(lms=map(data, ~ lm(data=. , formula = iRep ~ treatment*day_num)), 
+         tid_sum = map(lms, tidy)) %>% select(genome, tid_sum) %>% 
+  unnest(cols = c('tid_sum'))
+
+
+hmmm %>% filter(term == 'day_num')
+
+
+###########
+
+dat %>% filter(genome %in% ctrl735$genome) %>% 
+  ggplot(aes(x=genome, y=iRep, fill=day)) + geom_boxplot() + 
+  coord_flip()
+
+
+
+ctrl735_lms <- dat %>% filter(genome %in% ctrl735$genome) %>% group_by(genome) %>% nest()
+
+ctrl735_lms %>% mutate(lms=map(data, ~ lm(data=. , formula = iRep ~ day_num)), 
+                       tid_sum = map(lms, tidy)) %>% select(genome, tid_sum) %>% 
+  unnest(cols = c('tid_sum')) %>% filter(term == 'day_num' & p.value < 0.05)
+
 ########
 
 nesty_dat <- dat %>% filter(genome %in% D7$genome & day %in%c('07') & treatment != 'sub') %>%
   group_by(genome) %>% nest() 
+
+nesty_dat <- dat %>% filter(genome %in% D35$genome & day %in%c('35') & treatment != 'sub') %>%
+  group_by(genome) %>% nest()
+
+
+
 
 
 mayb <- nesty_dat %>% 
@@ -203,7 +244,7 @@ checkm$genome <- sub('_new','',checkm$bin)
 
 checkm[checkm$genome %in% res$genome,]
 
-
+### D7 boxplots some sig diff btw groups
 
 dat %>% filter(genome %in% res$genome[1]) %>% filter(day == '07') %>% 
   ggplot(aes(x=treatment, y=iRep)) + geom_boxplot() + geom_point(aes(color=`relative abundance`), size=3) + scale_color_viridis_c()
@@ -219,6 +260,9 @@ dat %>% filter(genome %in% res$genome[4]) %>% filter(day == '07') %>%
 
 dat %>% filter(genome %in% res$genome[5]) %>% filter(day == '07') %>% 
   ggplot(aes(x=treatment, y=iRep)) + geom_boxplot() + geom_point(aes(color=`relative abundance`), size=3) + scale_color_viridis_c()
+
+
+##### D35 boxplots
 
 dat %>% filter(genome %in% res$genome[6]) %>% filter(day == '07') %>% 
   ggplot(aes(x=treatment, y=iRep)) + geom_boxplot() + geom_point(aes(color=`relative abundance`), size=3) + scale_color_viridis_c()
