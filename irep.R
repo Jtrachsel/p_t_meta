@@ -40,7 +40,11 @@ dat %>% ggplot(aes(x=log2(coverage))) + geom_histogram(bins = 100)
 
 
 cor.test(x = dat$iRep, log(dat$`relative abundance`))
+cor.test(x = dat$iRep, (dat$`relative abundance`))
+
 dat %>% ggplot(aes(x=log(`relative abundance`), y=iRep)) + geom_point() + geom_smooth(method = 'lm')
+
+dat %>% ggplot(aes(x=(`relative abundance`), y=iRep)) + geom_point() + geom_smooth(method = 'lm')
 
 
 cor.test(x = dat$iRep, log(dat$coverage))
@@ -175,8 +179,17 @@ ther735
 
 # these bins can be used to compare growth rates in all 3 treatments at days 7 and 35
 #4 bins
+# probably a little too complicated to try and assess the effect of treatment as well as timepoint at 
+# the same time, especialyl becuase the data are sparse....
 lmbins <- intersect(intersect(ctrl735$genome, sub735$genome), ther735$genome)
 lmbins
+
+
+#### this is looking
+test <- dat %>% filter(genome %in% lmbins & day %in%c('07','35'))
+
+summary(lm(data=test, formula = iRep ~ genome + day*treatment))
+
 
 
 
@@ -192,27 +205,91 @@ summary(lm(data = test, formula = iRep ~ treatment*day_num))
 
 ###########
 hmmm <- d735_lms %>%ungroup() %>% 
-  mutate(lms=map(data, ~ lm(data=. , formula = iRep ~ treatment*day_num)), 
+  mutate(lms=map(data, ~ lm(data=. , formula = iRep ~ treatment*day)), 
          tid_sum = map(lms, tidy)) %>% select(genome, tid_sum) %>% 
   unnest(cols = c('tid_sum'))
 
 
-hmmm %>% filter(term == 'day_num')
+hmmm %>% filter(p.value <= 0.05)
 
+
+dat %>% filter(genome %in% lmbins & day %in%c('07','35')) %>% 
+  ggplot(aes(x=genome, y=iRep, fill=treatment, shape=day)) + geom_boxplot() +geom_jitter()
+
+
+
+dat %>% filter(genome == 'bin.493' & day %in%c('07','35')) %>% 
+  ggplot(aes(x=day, y=iRep, fill=treatment), shape=21) + geom_boxplot() +geom_jitter(position = position_dodge2(width = .75))
+
+
+
+
+# bin.493: no terms seem to influence growth rate.  no evidence that treatment group or day 
 
 ###########
+### CONTROL ONLY DIFFERENCES BETWEEN GROWTH RATES AT D7 AND D35
 
-dat %>% filter(genome %in% ctrl735$genome) %>% 
-  ggplot(aes(x=genome, y=iRep, fill=day)) + geom_boxplot() + 
-  coord_flip()
+dat %>% filter(genome %in% ctrl735$genome & day %in% c('07', '35'))%>% 
+  ggplot(aes(x=genome, y=iRep, fill=day)) + geom_boxplot() 
 
 
+dat %>% filter(genome %in% ctrl735$genome & day %in% c('07', '35'))%>% 
+  ggplot(aes(x=day, y=iRep, fill=day)) + geom_violin() 
 
-ctrl735_lms <- dat %>% filter(genome %in% ctrl735$genome) %>% group_by(genome) %>% nest()
 
-ctrl735_lms %>% mutate(lms=map(data, ~ lm(data=. , formula = iRep ~ day_num)), 
+test <- dat %>% filter(genome %in% ctrl735$genome & day %in% c('07', '35'))
+
+summary(lm(data=test, formula = iRep ~ day+genome))
+
+ctrl735_lms <- dat %>% filter(genome %in% ctrl735$genome & day %in% c('07', '35')) %>% group_by(genome) %>% nest()
+
+ctrl735_lms %>% mutate(lms=map(data, ~ lm(data=. , formula = iRep ~ day)), 
                        tid_sum = map(lms, tidy)) %>% select(genome, tid_sum) %>% 
-  unnest(cols = c('tid_sum')) %>% filter(term == 'day_num' & p.value < 0.05)
+  unnest(cols = c('tid_sum')) #%>% filter(term == 'day_num' & p.value < 0.05)
+
+############ DAY 7 DIFFS BTWEEN GRUOPS ##########
+
+dat %>% filter(genome %in% D7$genome & day %in% c('07'))%>% 
+  ggplot(aes(x=genome, y=iRep, fill=treatment)) + geom_boxplot() + geom_jitter(shape=21, position=position_dodge2(width = .75))
+
+dat %>% filter(genome %in% D7$genome & day %in% c('07'))%>% 
+  ggplot(aes(x=treatment, y=iRep, fill=treatment)) + geom_violin() + geom_jitter(shape=21, width = .2)
+
+
+
+
+
+D7$genome
+
+D7_treat_comp <- dat %>% filter(genome %in% D7$genome & day %in% c('07'))
+
+
+summary(lm(data=D7_treat_comp, formula = iRep ~ treatment + genome))
+
+###### DAY 35 DIFF BTWEEN GROUPS #######
+
+dat %>% filter(genome %in% D35$genome & day %in% c('35'))%>% 
+  ggplot(aes(x=genome, y=iRep, fill=treatment)) + geom_boxplot() + geom_jitter(shape=21, position=position_dodge2(width = .75))
+
+D35$genome
+
+test <- dat %>% filter(genome %in% D35$genome & day %in% c('35'))
+
+
+summary(lm(data=test, formula = iRep ~ treatment + genome))
+
+###### Day 78 Diff BTWEEN GROUPS ######
+
+
+dat %>% filter(genome %in% D78$genome & day %in% c('78'))%>% 
+  ggplot(aes(x=genome, y=iRep, fill=treatment)) + geom_boxplot() + geom_jitter(shape=21, position=position_dodge2(width = .75))
+
+D78$genome
+
+test <- dat %>% filter(genome %in% D78$genome & day %in% c('78'))
+
+
+summary(lm(data=test, formula = iRep ~ treatment + genome))
 
 ########
 
