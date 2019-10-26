@@ -150,7 +150,7 @@ all_groups %>%
 # these ones can compare d7 vs d35 in ctrl
 
 # 15 bins
-ctrl735 <- look %>% 
+ctrl735 <- number_of_obs %>% 
 #  filter(num_w_4p >1) %>%
 #  filter(ctrl >3) %>%
   select(-bin_day, -num_NA, -num_w_4p) %>% 
@@ -161,7 +161,7 @@ ctrl735 <- look %>%
 ctrl735
 
 # 8 bins
-sub735 <- look %>% 
+sub735 <- number_of_obs %>% 
   #  filter(num_w_4p >1) %>%
   #  filter(ctrl >3) %>%
   select(-bin_day, -num_NA, -num_w_4p) %>% 
@@ -172,7 +172,7 @@ sub735 <- look %>%
 sub735
 
 # 11 bins
-ther735 <- look %>% 
+ther735 <- number_of_obs %>% 
   #  filter(num_w_4p >1) %>%
   #  filter(ctrl >3) %>%
   select(-bin_day, -num_NA, -num_w_4p) %>% 
