@@ -29,6 +29,8 @@ dat <- read_tsv('ALL_RESULTS_BULK_MAP.txt', skip = 1, col_types = c('iccnnnnnnni
 
 dat <- dat %>% filter(coverage > 5)
 
+
+dat %>% ggplot(aes(x=(coverage))) + geom_histogram(bins = 100)
 dat %>% ggplot(aes(x=log2(coverage))) + geom_histogram(bins = 100)
 
 
@@ -42,21 +44,23 @@ dat %>% ggplot(aes(x=log2(coverage))) + geom_histogram(bins = 100)
 cor.test(x = dat$iRep, log(dat$`relative abundance`))
 cor.test(x = dat$iRep, (dat$`relative abundance`))
 
-dat %>% ggplot(aes(x=log(`relative abundance`), y=iRep)) + geom_point() + geom_smooth(method = 'lm')
+
+dat$log_relabund <- log(dat$`relative abundance`)
+dat %>% ggplot(aes(x=log_relabund, y=iRep)) + geom_point() + geom_smooth(method = 'lm')
 
 dat %>% ggplot(aes(x=(`relative abundance`), y=iRep)) + geom_point() + geom_smooth(method = 'lm')
 
 
-cor.test(x = dat$iRep, log(dat$coverage))
-dat %>% ggplot(aes(x=log(coverage), y=iRep)) + geom_point() + geom_smooth(method = 'lm')
-log(5)
+# cor.test(x = dat$iRep, log(dat$coverage))
+# dat %>% ggplot(aes(x=log(coverage), y=iRep)) + geom_point() + geom_smooth(method = 'lm')
+# log(5)
 
 
 ###### relabund and coverage v. strongly correlated #####
-cor.test(x = log(dat$`relative abundance`), log(dat$coverage))
-dat %>% ggplot(aes(x=log(coverage), y=log(`relative abundance`))) + geom_point() + geom_smooth(method = 'lm')
+# cor.test(x = log(dat$`relative abundance`), log(dat$coverage))
+# dat %>% ggplot(aes(x=log(coverage), y=log(`relative abundance`))) + geom_point() + geom_smooth(method = 'lm')
 
-
+############
 
 
 
@@ -70,10 +74,11 @@ valid_irep_totbin <- dat %>% group_by(genome) %>% tally() %>% arrange(desc(n))
 colnams <- c('bin', 'marker_lineage', 'num_genomes', 'num_markers', 'num_marker_sets', 'x0', 'x1', 'x2', 'x3','x4','x5+', 'Completeness', 'Contamination', 'Strain_heterogeneity')
 checkm <- read_delim('CheckM_clean3.txt', delim = '\t', trim_ws = TRUE, skip = 2, col_names = colnams)
 
+checkm <- checkm %>% mutate(bin=sub('_new', '', bin)) 
 
 # calculating which bins have enough datapoints available for meaningful stats
 
-look <- dat %>% 
+number_of_obs <- dat %>% 
   group_by(day, treatment, genome) %>% 
   tally() %>% spread(key = treatment, value=n) %>%
   ungroup() %>% group_by(day, genome) %>% 
@@ -83,15 +88,17 @@ look <- dat %>%
   unite(col = 'bin_day', genome, day, remove = FALSE)
   
 #### These have at least 2 groups with 4+ observations
-two_groups <- look %>%  filter(num_w_4p > 1)  
+two_groups <- number_of_obs %>%  filter(num_w_4p > 1)  
 two_groups
+
 # these have all 3 groups represented by at least 4 data points each
-all_groups <- look %>% filter(num_w_4p == 3)
+all_groups <- number_of_obs %>% filter(num_w_4p == 3)
 all_groups
+
 # no bin has 4 or more observations in every group at every timepoint
-look %>% select(genome, day, num_w_4p) %>%
+number_of_obs %>% select(genome, day, num_w_4p) %>%
   spread(key = day, value = num_w_4p) %>% 
-  mutate(nine = `07`+ `35`+ `78`) %>% arrange(desc(nine)) %>% 
+  mutate(all_times = `07`+ `35`+ `78`) %>% arrange(desc(all_times)) %>% 
   mutate(d7g = ifelse(`07` == 3, TRUE, FALSE), 
          d35g = ifelse(`35` == 3, TRUE, FALSE),
          d78g = ifelse(`78` == 3, TRUE, FALSE))
@@ -188,7 +195,7 @@ lmbins
 #### this is looking
 test <- dat %>% filter(genome %in% lmbins & day %in%c('07','35'))
 
-summary(lm(data=test, formula = iRep ~ genome + day*treatment))
+summary(lm(data=test, formula = iRep ~ genome + day + treatment))
 
 
 
@@ -197,7 +204,7 @@ summary(lm(data=test, formula = iRep ~ genome + day*treatment))
 d735_lms <- dat %>% filter(genome %in% lmbins & day %in%c('07','35')) %>% group_by(genome) %>% nest()
 
 d735_lms[4,1]
-test <- d735_lms[4,2][[1]][[1]]
+test <- d735_lms[3,2][[1]][[1]]
 test %>% ggplot(aes(x=treatment, y=iRep)) + geom_boxplot() + facet_wrap(~day)
 
 
@@ -245,16 +252,29 @@ ctrl735_lms <- dat %>% filter(genome %in% ctrl735$genome & day %in% c('07', '35'
 
 ctrl735_lms %>% mutate(lms=map(data, ~ lm(data=. , formula = iRep ~ day)), 
                        tid_sum = map(lms, tidy)) %>% select(genome, tid_sum) %>% 
-  unnest(cols = c('tid_sum')) #%>% filter(term == 'day_num' & p.value < 0.05)
+  unnest(cols = c('tid_sum')) %>% filter(term == 'day35' & p.value < 0.05)
 
 ############ DAY 7 DIFFS BTWEEN GRUOPS ##########
 
-dat %>% filter(genome %in% D7$genome & day %in% c('07'))%>% 
-  ggplot(aes(x=genome, y=iRep, fill=treatment)) + geom_boxplot() + geom_jitter(shape=21, position=position_dodge2(width = .75))
 
 dat %>% filter(genome %in% D7$genome & day %in% c('07'))%>% 
-  ggplot(aes(x=treatment, y=iRep, fill=treatment)) + geom_violin() + geom_jitter(shape=21, width = .2)
+  group_by(genome, treatment) %>% 
+  summarise(miRep=mean(iRep), 
+            se=sd(iRep)/sqrt(n())) %>% 
+  ggplot(aes(x=genome, y=miRep, fill=treatment)) + geom_col(position = 'dodge', color='black')
 
+
+
+dat %>% filter(genome %in% D7$genome & day %in% c('07'))%>% 
+  ggplot(aes(x=treatment, y=iRep, fill=treatment)) + geom_violin() + geom_jitter(shape=21, width = .2)+
+  ggtitle('iRep growth rate estimates at D7', '') + theme_bw() +
+  stat_summary(fun.y = "mean", colour = "black", size = 2, geom = "point")
+
+dat %>% filter(genome %in% D7$genome & day %in% c('07'))%>% 
+  ggplot(aes(x=genome, y=iRep, fill=treatment)) +
+  geom_boxplot() +
+  geom_jitter(shape=21, position=position_dodge2(width = .75)) + 
+  ggtitle('iRep growth rate estimates at D7') + theme_bw()
 
 
 
@@ -264,19 +284,80 @@ D7$genome
 D7_treat_comp <- dat %>% filter(genome %in% D7$genome & day %in% c('07'))
 
 
+sigs <- D7_treat_comp %>% group_by(genome) %>% nest() %>% 
+  mutate(ANOVA=map(data, ~ aov(data=., iRep ~ treatment)), 
+         tuk = map(ANOVA, TukeyHSD), 
+         tid_tuk = map(tuk, tidy)) %>% 
+  select(genome, tid_tuk) %>% 
+  unnest(cols = tid_tuk) %>%
+  mutate(tuk_pval = adj.p.value, 
+         fdr.pval = p.adjust(tuk_pval, method = 'fdr')) %>% 
+  select(-adj.p.value) %>% filter(tuk_pval < 0.05)
+
+library(lme4)
+library(lmerTest)
+
+
+
+
+
+dat %>% filter(genome %in% D7$genome & day %in% c('07'))%>% 
+  filter(genome %in% sigs$genome) %>% 
+  ggplot(aes(x=genome, y=iRep, fill=treatment)) +
+  geom_boxplot() +
+  geom_jitter(shape=21, position=position_dodge2(width = .75)) + 
+  ggtitle('iRep growth rate estimates at D7') + theme_bw()
+
+
+summary(lmer(data = D7_treat_comp, formula = iRep ~ treatment + (1+treatment|genome)))
+summary(lmer(data = D7_treat_comp, formula = iRep ~ treatment + (1|genome)))
+
+
+
 summary(lm(data=D7_treat_comp, formula = iRep ~ treatment + genome))
+summary(lm(data=D7_treat_comp, formula = iRep ~ treatment * genome))
+summary(lm(data=D7_treat_comp, formula = iRep ~ genome * treatment))
+
+checkm %>% filter(bin %in% sigs$genome)
+
 
 ###### DAY 35 DIFF BTWEEN GROUPS #######
 
-dat %>% filter(genome %in% D35$genome & day %in% c('35'))%>% 
-  ggplot(aes(x=genome, y=iRep, fill=treatment)) + geom_boxplot() + geom_jitter(shape=21, position=position_dodge2(width = .75))
-
 D35$genome
 
-test <- dat %>% filter(genome %in% D35$genome & day %in% c('35'))
+D35_treat_comp <- dat %>% filter(genome %in% D35$genome & day %in% c('35'))
 
 
-summary(lm(data=test, formula = iRep ~ treatment + genome))
+summary(lm(data=D35_treat_comp, formula = iRep ~ treatment + genome))
+summary(lm(data=D35_treat_comp, formula = iRep ~ treatment * genome))
+
+
+D35_treat_comp %>% ggplot(aes(x=treatment, y=iRep, fill=treatment)) +
+  geom_violin() + geom_jitter(shape=21, width = .2) + 
+  ggtitle('iRep growth rate estimates at D35') + theme_bw()
+
+
+dat %>% filter(genome %in% D35$genome & day %in% c('35'))%>% 
+  ggplot(aes(x=genome, y=iRep, fill=treatment)) + geom_boxplot() +
+  geom_jitter(shape=21, position=position_dodge2(width = .75)) +
+  ggtitle('iRep growth rate estimates at D35, by genome') + theme_bw()
+
+
+
+
+sigs <- D35_treat_comp %>% group_by(genome) %>% nest() %>% 
+  mutate(ANOVA=map(data, ~ aov(data=., iRep ~ treatment)), 
+         tuk = map(ANOVA, TukeyHSD), 
+         tid_tuk = map(tuk, tidy)) %>% 
+  select(genome, tid_tuk) %>% 
+  unnest(cols = tid_tuk) %>%
+  mutate(tuk_pval = adj.p.value, 
+         fdr.pval = p.adjust(tuk_pval, method = 'fdr')) %>% 
+  select(-adj.p.value) %>% filter(tuk_pval < 0.05)
+
+
+
+
 
 ###### Day 78 Diff BTWEEN GROUPS ######
 
@@ -286,10 +367,44 @@ dat %>% filter(genome %in% D78$genome & day %in% c('78'))%>%
 
 D78$genome
 
-test <- dat %>% filter(genome %in% D78$genome & day %in% c('78'))
+D78_treat_comp <- dat %>% filter(genome %in% D78$genome & day %in% c('78'))
 
 
-summary(lm(data=test, formula = iRep ~ treatment + genome))
+summary(lm(data=D78_treat_comp, formula = iRep ~ treatment + genome))
+summary(lm(data=D78_treat_comp, formula = iRep ~ treatment * genome))
+
+
+D78_treat_comp %>% ggplot(aes(x=treatment, y=iRep, fill=treatment)) +
+  geom_violin() + geom_jitter(shape=21, width = .2) + 
+  ggtitle('iRep growth rate estimates at D78') + theme_bw()
+
+
+D78_treat_comp %>% #filter(genome %in% D35$genome & day %in% c('35'))%>% 
+  ggplot(aes(x=genome, y=iRep, fill=treatment)) + geom_boxplot() +
+  geom_jitter(shape=21, position=position_dodge2(width = .75)) +
+  ggtitle('iRep growth rate estimates at D78, by genome') + theme_bw()
+
+
+sigs <- D78_treat_comp %>% group_by(genome) %>% nest() %>% 
+  mutate(ANOVA=map(data, ~ aov(data=., iRep ~ treatment)), 
+         tuk = map(ANOVA, TukeyHSD), 
+         tid_tuk = map(tuk, tidy)) %>% 
+  select(genome, tid_tuk) %>% 
+  unnest(cols = tid_tuk) %>%
+  mutate(tuk_pval = adj.p.value, 
+         fdr.pval = p.adjust(tuk_pval, method = 'fdr')) %>% 
+  select(-adj.p.value) %>% filter(tuk_pval < 0.05)
+
+
+
+
+
+
+
+
+
+
+
 
 ########
 
@@ -514,3 +629,4 @@ summary(lm(data = dat7, formula = iRep ~ genome*treatment))
 # install.packages('dplyr')
 # install.packages('tibble')
 # install.packages('tidyverse')
+
