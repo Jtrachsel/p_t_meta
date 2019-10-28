@@ -10,8 +10,17 @@ library(tidyverse)
 library(broom)
 
 
+#  CheckM bin info  #
+colnams <- c('bin', 'marker_lineage', 'num_genomes', 'num_markers', 'num_marker_sets', 'x0', 'x1', 'x2', 'x3','x4','x5+', 'Completeness', 'Contamination', 'Strain_heterogeneity')
+
+checkm <- read_delim('CheckM_clean3.txt', delim = '\t', trim_ws = TRUE, skip = 2, col_names = colnams) %>%
+  mutate(bin=sub('_new', '', bin)) 
+
+
+
+# read in the data and extract some metadata from sample names
 dat <- read_tsv('ALL_RESULTS_BULK_MAP.txt', skip = 1, col_types = c('iccnnnnnnninn'))%>%
-  mutate(sample = sub('_mapped.sam','',sample), 
+  mutate(sample = sub('_mapped.sam','',sample),
          genome = sub('.fa','',genome),
          day = sub('d([0-9][0-9])([a-z]+)([0-9][0-9][0-9])','\\1',sample), 
          treatment = sub('d([0-9][0-9])([a-z]+)([0-9][0-9][0-9])','\\2',sample), 
@@ -22,59 +31,41 @@ dat <- read_tsv('ALL_RESULTS_BULK_MAP.txt', skip = 1, col_types = c('iccnnnnnnni
   select(-X1, -`fragments/Mbp`)
 
 
-# 3439 valid iRep values with 3x min cov... maybe should bump back up to 5
-# 3342 actually without the 'extra' samples
-
-#dat5 <- dat %>% filter(coverage > 5)
-
-dat <- dat %>% filter(coverage > 5)
+dat <- dat %>% filter(coverage > 5)  # only keep estimates from samples where bins had > 5x coverage (as reccommended)
 
 
-dat %>% ggplot(aes(x=(coverage))) + geom_histogram(bins = 100)
-dat %>% ggplot(aes(x=log2(coverage))) + geom_histogram(bins = 100)
+dat %>% ggplot(aes(x=(coverage))) + geom_histogram(bins = 100)  # some bins have extremely high coverage
+dat %>% ggplot(aes(x=log2(coverage))) + geom_histogram(bins = 100) 
 
 
-# 2337 valid values with 5x cutoff
-# 2278 
+# 2278 valid iRep estimates 
 
 
 #### iRep is significantly negatively correlated with both coverage and relative abundance
 
 
-cor.test(x = dat$iRep, log(dat$`relative abundance`))
-cor.test(x = dat$iRep, (dat$`relative abundance`))
-
-
 dat$log_relabund <- log(dat$`relative abundance`)
-dat %>% ggplot(aes(x=log_relabund, y=iRep)) + geom_point() + geom_smooth(method = 'lm')
+dat %>% ggplot(aes(x=log_relabund, y=iRep)) +
+  geom_point() +
+  geom_smooth(method = 'lm') +
+  theme_bw()
 
-dat %>% ggplot(aes(x=(`relative abundance`), y=iRep)) + geom_point() + geom_smooth(method = 'lm')
-
-
-# cor.test(x = dat$iRep, log(dat$coverage))
-# dat %>% ggplot(aes(x=log(coverage), y=iRep)) + geom_point() + geom_smooth(method = 'lm')
-# log(5)
-
-
-###### relabund and coverage v. strongly correlated #####
-# cor.test(x = log(dat$`relative abundance`), log(dat$coverage))
-# dat %>% ggplot(aes(x=log(coverage), y=log(`relative abundance`))) + geom_point() + geom_smooth(method = 'lm')
-
-############
+cor.test(x = dat$iRep, log(dat$`relative abundance`))
 
 
 
-
-
-valid_irep_by_day <- dat %>% group_by(genome, day) %>% tally() %>% spread(key = day, value=n)
+# valid_irep_by_day <- dat %>% group_by(genome, day) %>% tally() %>% spread(key = day, value=n)
 valid_irep_totbin <- dat %>% group_by(genome) %>% tally() %>% arrange(desc(n))
 
+valid_irep_totbin %>%
+  ggplot(aes(x=n)) +
+  geom_histogram(bins = 50) +
+  xlab('number of valid iRep estimates')+
+  ggtitle('number of valid iRep estimates per bin') + 
+  theme_bw()
 
-#  CheckM bin info  #
-colnams <- c('bin', 'marker_lineage', 'num_genomes', 'num_markers', 'num_marker_sets', 'x0', 'x1', 'x2', 'x3','x4','x5+', 'Completeness', 'Contamination', 'Strain_heterogeneity')
-checkm <- read_delim('CheckM_clean3.txt', delim = '\t', trim_ws = TRUE, skip = 2, col_names = colnams)
 
-checkm <- checkm %>% mutate(bin=sub('_new', '', bin)) 
+
 
 # calculating which bins have enough datapoints available for meaningful stats
 
@@ -87,6 +78,10 @@ number_of_obs <- dat %>%
   ungroup() %>% 
   unite(col = 'bin_day', genome, day, remove = FALSE)
   
+number_of_obs
+
+
+# data grouped by bin and day to tally numobs per group
 #### These have at least 2 groups with 4+ observations
 two_groups <- number_of_obs %>%  filter(num_w_4p > 1)  
 two_groups
@@ -102,6 +97,13 @@ number_of_obs %>% select(genome, day, num_w_4p) %>%
   mutate(d7g = ifelse(`07` == 3, TRUE, FALSE), 
          d35g = ifelse(`35` == 3, TRUE, FALSE),
          d78g = ifelse(`78` == 3, TRUE, FALSE))
+
+
+# kindof makes sense, both ABX treatment and time affected the community composition
+#
+# Will probably have to stick to comparing iRep estimates in two main ways:
+#  1) Within timepoint between treatments
+#  2) within a treatment between timepoints
 
 
 ## one timepoint ##
@@ -142,6 +144,14 @@ all_groups %>%
   spread(key=day, value = num_w_4p) %>% 
   mutate(d35vd78 = `35` + `78`) %>% 
   filter(!is.na(d35vd78))
+
+# no bin has all 3 groups with 4+ observations at d7 and d78
+all_groups %>%
+  select(genome, day, num_w_4p) %>% 
+  spread(key=day, value = num_w_4p) %>% 
+  mutate(d07vd78 = `07` + `78`) %>% 
+  filter(!is.na(d07vd78))
+
 
 
 ### 4+ in 2 groups by day ###
@@ -195,22 +205,20 @@ lmbins
 #### this is looking
 test <- dat %>% filter(genome %in% lmbins & day %in%c('07','35'))
 
-summary(lm(data=test, formula = iRep ~ genome + day + treatment))
+summary(lm(data = test, formula = iRep ~ treatment*day))
 
-
-
-
+summary(lm(data = test, formula = iRep ~ genome + day + treatment))
 
 d735_lms <- dat %>% filter(genome %in% lmbins & day %in%c('07','35')) %>% group_by(genome) %>% nest()
 
-d735_lms[4,1]
-test <- d735_lms[3,2][[1]][[1]]
-test %>% ggplot(aes(x=treatment, y=iRep)) + geom_boxplot() + facet_wrap(~day)
+# d735_lms[4,1]
+# test <- d735_lms[3,2][[1]][[1]]
+# test %>% ggplot(aes(x=treatment, y=iRep)) + geom_boxplot() + facet_wrap(~day)
 
 
-summary(lm(data = test, formula = iRep ~ treatment*day_num))
 
 ###########
+
 hmmm <- d735_lms %>%ungroup() %>% 
   mutate(lms=map(data, ~ lm(data=. , formula = iRep ~ treatment*day)), 
          tid_sum = map(lms, tidy)) %>% select(genome, tid_sum) %>% 
@@ -256,15 +264,6 @@ ctrl735_lms %>% mutate(lms=map(data, ~ lm(data=. , formula = iRep ~ day)),
 
 ############ DAY 7 DIFFS BTWEEN GRUOPS ##########
 
-
-dat %>% filter(genome %in% D7$genome & day %in% c('07'))%>% 
-  group_by(genome, treatment) %>% 
-  summarise(miRep=mean(iRep), 
-            se=sd(iRep)/sqrt(n())) %>% 
-  ggplot(aes(x=genome, y=miRep, fill=treatment)) + geom_col(position = 'dodge', color='black')
-
-
-
 dat %>% filter(genome %in% D7$genome & day %in% c('07'))%>% 
   ggplot(aes(x=treatment, y=iRep, fill=treatment)) + geom_violin() + geom_jitter(shape=21, width = .2)+
   ggtitle('iRep growth rate estimates at D7', '') + theme_bw() +
@@ -277,6 +276,13 @@ dat %>% filter(genome %in% D7$genome & day %in% c('07'))%>%
   ggtitle('iRep growth rate estimates at D7') + theme_bw()
 
 
+dat %>% filter(genome %in% D7$genome & day %in% c('07'))%>% 
+  group_by(genome, treatment) %>% 
+  summarise(miRep=mean(iRep), 
+            se=sd(iRep)/sqrt(n())) %>% 
+  ggplot(aes(x=genome, y=miRep, fill=treatment)) +
+  geom_col(position = 'dodge', color='black') + 
+  geom_errorbar(aes(ymin=miRep-se, ymax=miRep + se), position = 'dodge')
 
 
 D7$genome
@@ -293,6 +299,8 @@ sigs <- D7_treat_comp %>% group_by(genome) %>% nest() %>%
   mutate(tuk_pval = adj.p.value, 
          fdr.pval = p.adjust(tuk_pval, method = 'fdr')) %>% 
   select(-adj.p.value) %>% filter(tuk_pval < 0.05)
+
+sigs
 
 library(lme4)
 library(lmerTest)
@@ -355,7 +363,7 @@ sigs <- D35_treat_comp %>% group_by(genome) %>% nest() %>%
          fdr.pval = p.adjust(tuk_pval, method = 'fdr')) %>% 
   select(-adj.p.value) %>% filter(tuk_pval < 0.05)
 
-
+sigs
 
 
 
@@ -396,6 +404,7 @@ sigs <- D78_treat_comp %>% group_by(genome) %>% nest() %>%
   select(-adj.p.value) %>% filter(tuk_pval < 0.05)
 
 
+sigs
 
 
 
@@ -406,7 +415,8 @@ sigs <- D78_treat_comp %>% group_by(genome) %>% nest() %>%
 
 
 
-########
+
+########  Excluding subther?  #######
 
 nesty_dat <- dat %>% filter(genome %in% D7$genome & day %in%c('07') & treatment != 'sub') %>%
   group_by(genome) %>% nest() 
@@ -513,7 +523,7 @@ dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>%
 
 
 dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
-  filter(bin_day %in% all_groups$bin_day) %>%
+  # filter(bin_day %in% all_groups$bin_day) %>%
   group_by(genome, day, treatment) %>% 
   summarise(iRep=mean(iRep)) %>% 
   ggplot(aes(x=day, y=iRep, group=genome, color=treatment)) + geom_point() + geom_line() + 
@@ -546,87 +556,3 @@ dat %>%
   arrange(desc(mean_irep)) %>% 
   filter(day =='78') %>% 
   ggplot(aes(y=genome, x=mean_irep, color=treatment)) + geom_point()#+ facet_wrap(~day)
-
-
-
-#### need to start splitting these out by bin....
-
-
-# install.packages("pillar")
-# install.packages('dplyr')
-# 
-# nesty_dat <- dat %>%
-#   unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
-#   filter(bin_day %in% group_compare$bin_day) %>% 
-#   filter(day == '07') %>% group_by(genome) %>%
-#   nest()
-
-nesty_dat <- dat %>%
-  unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
-  filter(bin_day %in% group_compare$bin_day) %>% 
-  group_by(genome, day) %>%
-  nest()
-
-
-
-
-test <- nesty_dat[25,][[3]][[1]]
-
-summary(aov(data = test, formula = iRep ~ treatment))
-
-
-tests_treat <- nesty_dat %>% 
-  mutate(inter = map(data, ~ aov(data = ., formula = iRep ~ treatment)), 
-         summ = map(inter, summary), 
-         tid_sum = map(inter, tidy)) %>% 
-  select(genome, tid_sum) %>% unnest(cols = c(tid_sum)) %>% 
-  filter(term == 'treatment') 
-
-
-tests_treat %>% select(genome)
-
-tests_treat$fdr <- p.adjust(tests_treat$p.value, method = 'fdr')
-tests_treat$BH <- p.adjust(tests_treat$p.value, method = 'BH')
-tests_treat$BY <- p.adjust(tests_treat$p.value, method = 'BY')
-tests_treat$holm <- p.adjust(tests_treat$p.value, method = 'holm')
-tests_treat$hoch <- p.adjust(tests_treat$p.value, method = 'hochberg')
-tests_treat$homm <- p.adjust(tests_treat$p.value, method = 'hommel')
-tests_treat$bonferroni <- p.adjust(tests_treat$p.value, method = 'bonferroni')
-
-
-tests_treat %>% filter(BH < 0.1)
-
-###
-p.adjust.methods
-
-dat
-
-
-dat7 <- dat %>% filter(day == '07')
-
-summary(lm(data = dat7, formula = iRep ~ genome*treatment))
-
-
-
-
-# 
-# sessionInfo()
-# 
-# 
-# 
-
-# mtcars %>%
-#   split(.$cyl) %>%
-#   map(~ lm(mpg ~ wt, data = .)) %>%
-#   map(summary) %>%
-#   map_dbl("r.squared")
-
-
-# install.packages('stringr')
-# install.packages('tidyr')
-# install.packages('purrr')
-# install.packages('readr')
-# install.packages('dplyr')
-# install.packages('tibble')
-# install.packages('tidyverse')
-

@@ -60,3 +60,25 @@ output: html_document
       SHARE R SCRIPT
       
         
+        
+        
+        
+        
+```{r}
+
+hi <- read_tsv('ALL_pacbio_histogram.txt', skip = 9)
+
+
+hi %>% 
+  ggplot(aes(x=`#Length`, y=reads)) + geom_col() + theme_bw()
+
+
+hi %>% filter(`#Length` <15000) %>% 
+  ggplot(aes(x=`#Length`, y=reads)) + geom_col() + theme_bw()
+
+
+hi %>% filter(`#Length` <5000) %>% 
+  ggplot(aes(x=`#Length`, y=reads)) + geom_col() + theme_bw()
+
+```
+
