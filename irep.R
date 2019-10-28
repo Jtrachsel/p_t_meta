@@ -34,6 +34,22 @@ dat <- read_tsv('ALL_RESULTS_BULK_MAP.txt', skip = 1, col_types = c('iccnnnnnnni
 dat <- dat %>% filter(coverage > 5)  # only keep estimates from samples where bins had > 5x coverage (as reccommended)
 
 
+# dat %>% ggplot(aes(y=iRep, x=0)) +
+#   geom_violin() +
+#   geom_jitter(alpha=.05) +
+#   ylim(1,4) + xlim(-1, 1) +
+#   theme_bw() + 
+#   theme(axis.text.x = element_blank(), 
+#         axis.ticks.x = element_blank(), 
+#         axis.title.x = element_blank())
+
+
+dat %>% ggplot(aes(x=iRep)) +
+  geom_histogram(bins = 50) +
+  theme_bw()
+
+
+
 dat %>% ggplot(aes(x=(coverage))) + geom_histogram(bins = 100)  # some bins have extremely high coverage
 dat %>% ggplot(aes(x=log2(coverage))) + geom_histogram(bins = 100) 
 
@@ -64,8 +80,11 @@ valid_irep_totbin %>%
   ggtitle('number of valid iRep estimates per bin') + 
   theme_bw()
 
+#### NOW ONE WITH BINS THAT OCCUR 4+ TIMES IN EITHER 2 TIMEPOINTS PER TREAT or 4+ TIMS IN 2 TREATS PER TIMEPOINT
 
 
+
+#####
 
 # calculating which bins have enough datapoints available for meaningful stats
 
@@ -82,6 +101,14 @@ number_of_obs
 
 
 # data grouped by bin and day to tally numobs per group
+
+
+# These have at least 1 treatment group with 4+ observations at the given timepoint
+
+one_group <- number_of_obs %>%  filter(num_w_4p >= 1)
+one_group
+
+
 #### These have at least 2 groups with 4+ observations
 two_groups <- number_of_obs %>%  filter(num_w_4p > 1)  
 two_groups
@@ -509,17 +536,190 @@ summary(lm(data=test, formula = iRep ~day))
 
 ############ plots ###########
 
-# treatments by day
+### all data, unfiltered ###
+
+# histogram
+dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+  ggplot(aes(x=iRep)) + 
+  geom_histogram(bins=50)+
+  theme_bw()
+
+# boxplots
+dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+  ggplot(aes(x=treatment, y=iRep)) + geom_boxplot() + facet_wrap(~day)
+
+dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+  ggplot(aes(x=day, y=iRep)) + geom_boxplot() + facet_wrap(~treatment)
+
+
+dat %>% nrow()
+# 2278 observations
+dat %>% select(genome) %>% unlist() %>% unique() %>% length()
+# 244 genomes
+
+
+
+### 1 with 4 plus ###
+##### only includes estimates from bins that have at least 1 treatment with 4+ observations in any one timepoint  ##
+
+
+dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+  filter(bin_day %in% one_group$bin_day) %>% nrow()
+# 1572 observations
+
+dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+  filter(bin_day %in% one_group$bin_day) %>%
+  select(genome) %>% unlist() %>% unique() %>% length()
+#102 genomes
+
+
+# histogram
+dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+  filter(bin_day %in% one_group$bin_day) %>% 
+  ggplot(aes(x=iRep)) + 
+  geom_histogram(bins=50)+
+  theme_bw() + 
+  ggtitle('Histogram of iRep estimates',
+          'considering only those genomes that have \nat least 1 treatment with 4+ observations at any time')
+
+dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+  filter(bin_day %in% one_group$bin_day) %>%
+  group_by(genome) %>%
+  tally() %>% 
+  ggplot(aes(x=n))+geom_histogram(bins=30) + 
+  ggtitle('Valid iRep estimates per genome', 
+          'considering only those genomes that have \nat least 1 treatment with 4+ observations at any time')
+
+
+# boxplots
+dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+  filter(bin_day %in% one_group$bin_day) %>% 
+  ggplot(aes(x=treatment, y=iRep)) + geom_boxplot() + facet_wrap(~day) + 
+  ggtitle('NEED TITLE',
+          'considering only those genomes that have \nat least 1 treatment with 4+ observations at any time')
+
+dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+  filter(bin_day %in% one_group$bin_day) %>% 
+  ggplot(aes(x=day, y=iRep)) + geom_boxplot() + facet_wrap(~treatment) +
+  ggtitle('NEED TITLE', 
+          'considering only those genomes that have \nat least 1 treatment with 4+ observations at any time')
+
+
+
+### 2 with 4 plus ###
 # only includes bins that have at least 2 treatments with 4+ observations
+
+dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+  filter(bin_day %in% two_groups$bin_day) %>% nrow()
+# 1062 observations
+
+dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+  filter(bin_day %in% two_groups$bin_day) %>%
+  select(genome) %>% unlist() %>% unique() %>% length()
+#56 genomes
+
+
+# histogram
+dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+  filter(bin_day %in% two_groups$bin_day) %>% 
+  ggplot(aes(x=iRep)) + 
+  geom_histogram(bins=50)+
+  theme_bw() + 
+  ggtitle('Histogram of iRep estimates',
+          'considering only those genomes that have \nat least 2 treatments with 4+ observations at any time')
+
+dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+  filter(bin_day %in% two_groups$bin_day) %>%
+  group_by(genome) %>%
+  tally() %>% 
+  ggplot(aes(x=n))+geom_histogram(bins=30) + 
+  ggtitle('Valid iRep estimates per genome', 
+          'considering only those genomes that have \nat least 2 treatments with 4+ observations at any time')
+
+
+# boxplots
+dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+  filter(bin_day %in% two_groups$bin_day) %>% 
+  ggplot(aes(x=treatment, y=iRep)) + geom_boxplot() + facet_wrap(~day) + 
+  ggtitle('NEED TITLE',
+          'considering only those genomes that have \nat least 2 treatments with 4+ observations at any time')
+
+dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+  filter(bin_day %in% two_groups$bin_day) %>% 
+  ggplot(aes(x=day, y=iRep)) + geom_boxplot() + facet_wrap(~treatment) +
+  ggtitle('NEED TITLE', 
+          'considering only those genomes that have \nat least 2 treatments with 4+ observations at any time')
+
+
+#### DELETE BELOW HERE TO
+#HIST
+
 dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
   filter(bin_day %in% two_groups$bin_day) %>% 
   ggplot(aes(x=treatment, y=iRep)) + geom_boxplot() + facet_wrap(~day)
 
-# days by treatment
+dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+  filter(bin_day %in% two_groups$bin_day) %>% 
+  ggplot(aes(x=day, y=iRep)) + geom_boxplot() + facet_wrap(~treatment)
+
+
+### HERE
+
+
+### 3 with 4 plus ###
 # only includes bins with 4+ observations in all 3 treatments
+
+dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+  filter(bin_day %in% all_groups$bin_day) %>% nrow()
+# 507 observations
+
+dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+  filter(bin_day %in% all_groups$bin_day) %>%
+  select(genome) %>% unlist() %>% unique() %>% length()
+#22 genomes
+
+
+# histogram
 dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
   filter(bin_day %in% all_groups$bin_day) %>% 
-  ggplot(aes(x=day, y=iRep)) + geom_boxplot() + facet_wrap(~treatment)
+  ggplot(aes(x=iRep)) + 
+  geom_histogram(bins=50)+
+  theme_bw() + 
+  ggtitle('Histogram of iRep estimates',
+          'considering only those genomes that have \nat least 3 treatments with 4+ observations at any time')
+
+dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+  filter(bin_day %in% all_groups$bin_day) %>%
+  group_by(genome) %>%
+  tally() %>% 
+  ggplot(aes(x=n))+geom_histogram(bins=30) + 
+  ggtitle('Valid iRep estimates per genome', 
+          'considering only those genomes that have \nat least 3 treatments with 4+ observations at any time')
+
+
+# boxplots
+dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+  filter(bin_day %in% all_groups$bin_day) %>% 
+  ggplot(aes(x=treatment, y=iRep)) + geom_boxplot() + facet_wrap(~day) + 
+  ggtitle('NEED TITLE',
+          'considering only those genomes that have \nat least 3 treatments with 4+ observations at any time')
+
+dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+  filter(bin_day %in% all_groups$bin_day) %>% 
+  ggplot(aes(x=day, y=iRep)) + geom_boxplot() + facet_wrap(~treatment) +
+  ggtitle('NEED TITLE', 
+          'considering only those genomes that have \nat least 3 treatments with 4+ observations at any time')
+
+
+
+###########
+
+
+dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+  filter(bin_day %in% all_groups$bin_day) %>%group_by(genome) %>% 
+  arrange(desc(iRep)) %>% ungroup() %>% 
+  mutate(genome2=factor(genome, levels = unique(genome))) %>% 
+  ggplot(aes(x=genome, y=iRep, fill=treatment)) + geom_boxplot() + geom_jitter(alpha=.2, shape=21)
 
 
 dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
@@ -556,3 +756,4 @@ dat %>%
   arrange(desc(mean_irep)) %>% 
   filter(day =='78') %>% 
   ggplot(aes(y=genome, x=mean_irep, color=treatment)) + geom_point()#+ facet_wrap(~day)
+
