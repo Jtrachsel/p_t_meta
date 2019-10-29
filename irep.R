@@ -46,12 +46,14 @@ dat <- dat %>% filter(coverage > 5)  # only keep estimates from samples where bi
 
 dat %>% ggplot(aes(x=iRep)) +
   geom_histogram(bins = 50) +
-  theme_bw()
+  theme_bw() + ggtitle('Histogram of all valid iRep estimates')
 
 
 
-dat %>% ggplot(aes(x=(coverage))) + geom_histogram(bins = 100)  # some bins have extremely high coverage
-dat %>% ggplot(aes(x=log2(coverage))) + geom_histogram(bins = 100) 
+dat %>% ggplot(aes(x=(coverage))) + geom_histogram(bins = 100) + 
+  ggtitle('Histogram of bin coverages')# some bins have extremely high coverage
+
+dat %>% ggplot(aes(x=log2(coverage))) + geom_histogram(bins = 100) +ggtitle('Histogram of log(coverage)')
 
 
 # 2278 valid iRep estimates 
@@ -59,6 +61,9 @@ dat %>% ggplot(aes(x=log2(coverage))) + geom_histogram(bins = 100)
 
 #### iRep is significantly negatively correlated with both coverage and relative abundance
 
+dat %>% ggplot(aes(x=`relative abundance`)) + geom_histogram(bins = 100) +ggtitle('Histogram of relative_abundance')
+
+dat %>% ggplot(aes(x=(log_relabund))) + geom_histogram(bins = 100) +ggtitle('Histogram of log(relative_abundance)')
 
 dat$log_relabund <- log(dat$`relative abundance`)
 dat %>% ggplot(aes(x=log_relabund, y=iRep)) +

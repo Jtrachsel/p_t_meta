@@ -1,0 +1,15 @@
+attribute	Megahit	Metaspades
+Main genome scaffold total:         	"1,486,743"	"1,370,062"
+Main genome contig total:           	"1,486,743"	"1,390,561"
+Main genome scaffold sequence total:	3849 MB	3637 MB
+Main genome contig sequence total:  	3849 MB	3636 MB
+Main genome scaffold N/L50:         	114231 / 6624	103354 / 6047
+Main genome contig N/L50:           	114231 / 6624	109063 / 5812
+Main genome scaffold N/L90:         	152813 / 5065	172075 / 3856
+Main genome contig N/L90:           	152813 / 5065	180267 / 3747
+Main genome assembly score:         	18.019	19.793
+Max scaffold length:                	1.063 MB	1.137 MB
+Max contig length:                  	1.063 MB	1.063 MB
+Number of scaffolds > 50 KB:        	"3,899"	"5,000"
+Number of bases in scaffolds>50 KB: 	347 MB	482 MB
+% main genome in scaffolds > 50 KB: 	9.04%	13.26%
