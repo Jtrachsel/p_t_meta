@@ -219,6 +219,34 @@ ther735 <- number_of_obs %>%
   filter(ther_07 > 3 & ther_35 > 3)
 ther735
 
+
+######## bin in eaither of these three groups #####
+# get the best idea of a d07 to d35 time effect
+
+all735 <- unique(c(ctrl735$genome, sub735$genome, ther735$genome))
+
+dat_all735 <- dat %>% filter(genome %in% all735 & day %in%c('07','35'))
+
+dat_all735 %>% ggplot(aes(x=day, y=iRep, fill=day)) +
+  geom_violin() +
+  stat_summary(geom = 'point', fun.y = 'mean')
+
+dat_all735 %>% group_by(genome, day) %>% 
+  summarise(miRep=mean(iRep)) %>%
+  spread(key=day, value = miRep) %>% ungroup() %>% 
+  mutate(diff_7_35=`07`-`35`)
+
+####### show direction of all d7 vs d35 changes
+
+summary(lm(data = dat_all735, formula = iRep~ day+genome))
+summary(lmer(data=dat_all735, formula = iRep ~ day+treatment + (1|genome)))
+
+summary(lmer(data = D7_treat_comp, formula = iRep ~ treatment + (1|genome)))
+summary
+
+###############
+
+#### bin in all of these three groups ####
 # ctrl735$genome
 
 # these bins can be used to compare growth rates in all 3 treatments at days 7 and 35
@@ -333,9 +361,6 @@ library(lme4)
 library(lmerTest)
 
 
-
-
-
 dat %>% filter(genome %in% D7$genome & day %in% c('07'))%>% 
   filter(genome %in% sigs$genome) %>% 
   ggplot(aes(x=genome, y=iRep, fill=treatment)) +
@@ -432,107 +457,6 @@ sigs <- D78_treat_comp %>% group_by(genome) %>% nest() %>%
 
 
 sigs
-
-
-
-
-
-
-
-
-
-
-
-########  Excluding subther?  #######
-
-nesty_dat <- dat %>% filter(genome %in% D7$genome & day %in%c('07') & treatment != 'sub') %>%
-  group_by(genome) %>% nest() 
-
-nesty_dat <- dat %>% filter(genome %in% D35$genome & day %in%c('35') & treatment != 'sub') %>%
-  group_by(genome) %>% nest()
-
-
-
-
-
-mayb <- nesty_dat %>% 
-  mutate(inter = map(data, ~ pairwise.t.test(x = .$iRep, g= .$treatment, p.adjust.method = 'none', pool.sd = TRUE)), 
-         #summ = map(inter, summary), 
-         tid_sum = map(inter, tidy)) %>% 
-  select(genome, tid_sum) %>% unnest(cols = c(tid_sum)) #%>% 
-  #filter(term == 'treatment') #%>% filter(adj.p.value < 0.05)
-
-
-mayb$p.adj <- p.adjust(mayb$p.value, method = 'fdr')
-
-
-res <- mayb %>% filter(p.adj < 0.1)
-
-checkm$genome <- sub('_new','',checkm$bin)
-
-
-checkm[checkm$genome %in% res$genome,]
-
-### D7 boxplots some sig diff btw groups
-
-dat %>% filter(genome %in% res$genome[1]) %>% filter(day == '07') %>% 
-  ggplot(aes(x=treatment, y=iRep)) + geom_boxplot() + geom_point(aes(color=`relative abundance`), size=3) + scale_color_viridis_c()
-
-dat %>% filter(genome %in% res$genome[2]) %>% filter(day == '07') %>% 
-  ggplot(aes(x=treatment, y=iRep)) + geom_boxplot() + geom_point(aes(color=`relative abundance`), size=3) + scale_color_viridis_c()
-
-dat %>% filter(genome %in% res$genome[3]) %>% filter(day == '07') %>% 
-  ggplot(aes(x=treatment, y=iRep)) + geom_boxplot() + geom_point(aes(color=`relative abundance`), size=3) + scale_color_viridis_c()
-
-dat %>% filter(genome %in% res$genome[4]) %>% filter(day == '07') %>% 
-  ggplot(aes(x=treatment, y=iRep)) + geom_boxplot() + geom_point(aes(color=`relative abundance`), size=3) + scale_color_viridis_c()
-
-dat %>% filter(genome %in% res$genome[5]) %>% filter(day == '07') %>% 
-  ggplot(aes(x=treatment, y=iRep)) + geom_boxplot() + geom_point(aes(color=`relative abundance`), size=3) + scale_color_viridis_c()
-
-
-##### D35 boxplots
-
-dat %>% filter(genome %in% res$genome[6]) %>% filter(day == '07') %>% 
-  ggplot(aes(x=treatment, y=iRep)) + geom_boxplot() + geom_point(aes(color=`relative abundance`), size=3) + scale_color_viridis_c()
-
-dat %>% filter(genome %in% res$genome[7]) %>% filter(day == '07') %>% 
-  ggplot(aes(x=treatment, y=iRep)) + geom_boxplot() + geom_point(aes(color=`relative abundance`), size=3) + scale_color_viridis_c()
-
-dat %>% filter(genome %in% res$genome[8]) %>% filter(day == '07') %>% 
-  ggplot(aes(x=treatment, y=iRep)) + geom_boxplot() + geom_point(aes(color=`relative abundance`), size=3) + scale_color_viridis_c()
-
-dat %>% filter(genome %in% res$genome[9]) %>% filter(day == '07') %>% 
-  ggplot(aes(x=treatment, y=iRep)) + geom_boxplot() + geom_point(aes(color=`relative abundance`), size=3) + scale_color_viridis_c()
-
-dat %>% filter(genome %in% res$genome[10]) %>% filter(day == '07') %>% 
-  ggplot(aes(x=treatment, y=iRep)) + geom_boxplot() + geom_point(aes(color=`relative abundance`), size=3) + scale_color_viridis_c()
-
-
-
-test <- nesty_dat[2,2][[1]][[1]]
-summary(pairwise.t.test(x=test$iRep, g=test$treatment))
-summary(aov(data=test, formula=iRep ~ treatment))
-
-
-#############
-
-dat %>%
-  mutate(day=as.numeric(day)) %>% 
-  filter(genome == 'bin.716' & treatment =='ctrl' & day %in% c(7, 35)) %>%
-  ggplot(aes(x=day, y=iRep)) +
-  geom_point() +
-  geom_smooth(method = 'lm')
-
-
-test <- dat %>%
-  mutate(day=as.numeric(day)) %>% 
-  filter(genome == 'bin.716' & treatment =='ctrl' & day %in% c(7, 35))
-
-
-
-summary(lm(data=test, formula = iRep ~day))
-
 
 ############ plots ###########
 
@@ -715,45 +639,29 @@ dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>%
 ###########
 
 
-dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
-  filter(bin_day %in% all_groups$bin_day) %>%group_by(genome) %>% 
-  arrange(desc(iRep)) %>% ungroup() %>% 
-  mutate(genome2=factor(genome, levels = unique(genome))) %>% 
-  ggplot(aes(x=genome, y=iRep, fill=treatment)) + geom_boxplot() + geom_jitter(alpha=.2, shape=21)
+# dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+#   filter(bin_day %in% all_groups$bin_day) %>%group_by(genome) %>% 
+#   arrange(desc(iRep)) %>% ungroup() %>% 
+#   mutate(genome2=factor(genome, levels = unique(genome))) %>% 
+#   ggplot(aes(x=genome, y=iRep, fill=treatment)) +
+#   geom_boxplot() +
+#   geom_jitter(alpha=.2, shape=21)
+# 
 
+# dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+#   # filter(bin_day %in% all_groups$bin_day) %>%
+#   group_by(genome, day, treatment) %>% 
+#   summarise(iRep=mean(iRep)) %>% 
+#   ggplot(aes(x=day, y=iRep, group=genome, color=treatment)) + geom_point() + geom_line() + 
+#   facet_wrap(~treatment)
+# 
+#  
+# dat %>%
+#   unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
+#   filter(bin_day %in% all_groups$bin_day) %>%
+#   group_by(day, treatment, genome) %>%
+#   summarise(mean_irep=mean(iRep)) %>% 
+#   arrange(desc(mean_irep)) %>% 
+#   ggplot(aes(y=genome, x=mean_irep, color=treatment)) + geom_point() + facet_wrap(~day)
 
-dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
-  # filter(bin_day %in% all_groups$bin_day) %>%
-  group_by(genome, day, treatment) %>% 
-  summarise(iRep=mean(iRep)) %>% 
-  ggplot(aes(x=day, y=iRep, group=genome, color=treatment)) + geom_point() + geom_line() + 
-  facet_wrap(~treatment)
-
- 
-dat %>%
-  unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
-  filter(bin_day %in% all_groups$bin_day) %>%
-  group_by(day, treatment, genome) %>%
-  summarise(mean_irep=mean(iRep)) %>% 
-  arrange(desc(mean_irep)) %>% 
-  ggplot(aes(y=genome, x=mean_irep, color=treatment)) + geom_point() + facet_wrap(~day)
-
-
-dat %>%
-  unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
-  filter(bin_day %in% group_compare$bin_day) %>%
-  group_by(day, treatment, genome) %>%
-  summarise(mean_irep=mean(iRep)) %>% 
-  arrange(desc(mean_irep)) %>% 
-  filter(day =='07') %>% 
-  ggplot(aes(y=genome, x=mean_irep, color=treatment)) + geom_point()#+ facet_wrap(~day)
-
-dat %>%
-  unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
-  filter(bin_day %in% group_compare$bin_day) %>%
-  group_by(day, treatment, genome) %>%
-  summarise(mean_irep=mean(iRep)) %>% 
-  arrange(desc(mean_irep)) %>% 
-  filter(day =='78') %>% 
-  ggplot(aes(y=genome, x=mean_irep, color=treatment)) + geom_point()#+ facet_wrap(~day)
 
