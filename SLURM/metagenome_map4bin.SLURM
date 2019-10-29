@@ -6,7 +6,7 @@
 #SBATCH -N 1                                           # number of nodes
 #SBATCH --mem=200G                                     # memory allocation
 #SBATCH -t 2:00:00                                     # time allocated for this job hours:mins:seconds
-#SBATCH --mail-user=julestrachsel@gmail.com            # will receive an email when job starts, ends or fails
+#SBATCH --mail-user=youremail@email.com                # will receive an email when job starts, ends or fails
 #SBATCH --mail-type=BEGIN,END,FAIL                     # will receive an email when job starts, ends or fails
 #SBATCH -o "stdout.%j.%N"                              # standard out %j adds job number to outputfile name and %N adds the node name
 #SBATCH -e "stderr.%j.%N"                              # optional but it prints our standard error

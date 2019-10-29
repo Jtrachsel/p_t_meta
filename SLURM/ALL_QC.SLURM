@@ -4,9 +4,9 @@
 #SBATCH -p mem                                         # name of the queue you are submitting to
 #SBATCH -n 40                                          # number of cores/tasks in this job, you get all 20 cores with 2 threads per core with hyperthreading
 #SBATCH -N 1                                           # nodes
-#SBATCH --mem=1000G                                    # memory allocation       
+#SBATCH --mem=1000G                                    # memory allocation  
 #SBATCH -t 72:00:00                                    # time allocated for this job hours:mins:seconds
-#SBATCH --mail-user=julestrachsel@gmail.com            # will receive an email when job starts, ends or fails
+#SBATCH --mail-user=YOUR_EMAIL@email.com               # will receive an email when job starts, ends or fails
 #SBATCH --mail-type=BEGIN,END,FAIL                     # will receive an email when job starts, ends or fails
 #SBATCH -o "stdout.%j.%N"                              # standard out %j adds job number to outputfile name and %N adds the node name
 #SBATCH -e "stderr.%j.%N"                              # optional but it prints our standard error
