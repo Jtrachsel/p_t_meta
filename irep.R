@@ -104,7 +104,7 @@ dat %>%
 
 ### But, we dont know if we are measuring the same genomes growth rates in each of these categories...
 
-#####
+#####  main point here is that the data are sparse #######
 
 # calculating which bins have enough datapoints available for meaningful stats
 
@@ -241,10 +241,8 @@ ther735
 
 
 
-############ plots ###########
+# start to pair down the data to only include genomes that have enough data for comparisons?
 
-
-### 1 group with 4 plus ###
 ##### only includes estimates from bins that have at least 1 treatment with 4+ observations in any one timepoint  ##
 
 
@@ -338,7 +336,7 @@ dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>%
 
 
 ### 3 with 4 plus ###
-# only includes bins with 4+ observations in all 3 treatments
+# only includes bins with 4+ observations in all 3 treatments at any one timepoint
 
 dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>% 
   filter(bin_day %in% all_groups$bin_day) %>% nrow()
@@ -381,10 +379,18 @@ dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>%
   ggtitle('iRep estimates by time', 
           'considering only those genomes that have \nat least 3 treatments with 4+ observations at any time')
 
+### Well, the data aren't idea, but we'll try to subset it and get something meaningful out of it.
+
+# specifically I am interested if there is statistical evidence for these two hypothesis:
+# 1) growth rates are supressed in the abx treatments relative to the controls
+# 2) growth rates are lower in the d35 communities relative to the D7 communities
+
 ####### TREATMENT EFFECTS ###########
-# only trying to asses treatment effect within each day. #
+# only trying to asses treatment effect within each day. 
 
 ############ DAY 7 DIFFS BTWEEN GRUOPS ##########
+# only includes genomes with 4+ observations in all 3 treatment groups at D7
+# 8 genomes, 149 observations
 
 dat %>% filter(genome %in% D7$genome & day %in% c('07'))%>% 
   ggplot(aes(x=treatment, y=iRep, fill=treatment)) + geom_violin() + geom_jitter(shape=21, width = .2)+
@@ -398,19 +404,10 @@ dat %>% filter(genome %in% D7$genome & day %in% c('07'))%>%
   ggtitle('iRep growth rate estimates at D7') + theme_bw()
 
 
-dat %>% filter(genome %in% D7$genome & day %in% c('07'))%>% 
-  group_by(genome, treatment) %>% 
-  summarise(miRep=mean(iRep), 
-            se=sd(iRep)/sqrt(n())) %>% 
-  ggplot(aes(x=genome, y=miRep, fill=treatment)) +
-  geom_col(position = 'dodge', color='black') + 
-  geom_errorbar(aes(ymin=miRep-se, ymax=miRep + se), position = 'dodge')
-
-
 D7_treat_comp <- dat %>% filter(genome %in% D7$genome & day %in% c('07'))
 
 
-tukeys <- D7_treat_comp %>% group_by(genome) %>% nest() %>% 
+D7_tukeys <- D7_treat_comp %>% group_by(genome) %>% nest() %>% 
   mutate(ANOVA=map(data, ~ aov(data=., iRep ~ treatment)), 
          tuk = map(ANOVA, TukeyHSD), 
          tid_tuk = map(tuk, tidy)) %>% 
@@ -419,7 +416,7 @@ tukeys <- D7_treat_comp %>% group_by(genome) %>% nest() %>%
   mutate(tuk_pval = adj.p.value, 
          fdr.pval = p.adjust(tuk_pval, method = 'fdr'))
 
-sigs <- tukeys %>%
+sigs <- D7_tukeys %>%
   select(-adj.p.value) %>% filter(tuk_pval < 0.05)
 
 sigs
@@ -432,7 +429,7 @@ dat %>% filter(genome %in% D7$genome & day %in% c('07'))%>%
   ggplot(aes(x=genome, y=iRep, fill=treatment)) +
   geom_boxplot() +
   geom_jitter(shape=21, position=position_dodge2(width = .75)) + 
-  ggtitle('iRep growth rate estimates at D7', 'tukey pval < 0.05 -- not adjusted for multiple comps') + theme_bw()
+  ggtitle('iRep growth rate estimates at D7', 'tukey pval < 0.05 -- not adjusted for multiple tukeys') + theme_bw()
 
 
 
@@ -445,22 +442,29 @@ dat %>% filter(genome %in% D7$genome & day %in% c('07'))%>%
 
 
 
+
+
+D7_tukeys %>% #filter(comparison != 'ther-sub') %>% 
+  ggplot(aes(x=genome, y=estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin=conf.low, ymax=conf.high), width=.2) + 
+  coord_flip() + geom_hline(yintercept = 0, color='red') + 
+  ggtitle('95% confidence intervals for the difference in growth rate between treatments',
+          'negative estimates indicate higher growth rate in ctrl, D7 only')+ facet_wrap(~comparison)
+
 # mixed model? not super confident about this.
 summary(lmer(data = D7_treat_comp, formula = iRep ~ treatment + (1|genome)))
-
-
 checkm %>% filter(bin %in% sigs$genome) %>% select(bin, marker_lineage, Completeness, Contamination)
 
 
-###### DAY 35 DIFF BTWEEN GROUPS #######
 
-# D35$genome
+
+###### DAY 35 DIFF BTWEEN GROUPS #######
+# only includes genomes with 4+ observations in all 3 treatment groups at D35
+# 11 genomes, 211 observations
+
 
 D35_treat_comp <- dat %>% filter(genome %in% D35$genome & day %in% c('35'))
-
-
-# summary(lm(data=D35_treat_comp, formula = iRep ~ treatment + genome))
-# summary(lm(data=D35_treat_comp, formula = iRep ~ treatment * genome))
 
 
 D35_treat_comp %>% ggplot(aes(x=treatment, y=iRep, fill=treatment)) +
@@ -476,38 +480,47 @@ dat %>% filter(genome %in% D35$genome & day %in% c('35'))%>%
 
 
 
-sigs <- D35_treat_comp %>% group_by(genome) %>% nest() %>% 
+D35_tukeys <- D35_treat_comp %>% group_by(genome) %>% nest() %>% 
   mutate(ANOVA=map(data, ~ aov(data=., iRep ~ treatment)), 
          tuk = map(ANOVA, TukeyHSD), 
          tid_tuk = map(tuk, tidy)) %>% 
   select(genome, tid_tuk) %>% 
   unnest(cols = tid_tuk) %>%
   mutate(tuk_pval = adj.p.value, 
-         fdr.pval = p.adjust(tuk_pval, method = 'fdr')) %>% 
-  select(-adj.p.value) %>% filter(tuk_pval < 0.05)
+         fdr.pval = p.adjust(tuk_pval, method = 'fdr')) 
 
-sigs
+sigs <- D35_tukeys %>% 
+  select(-adj.p.value) %>% filter(tuk_pval < 0.05)
 
 # no sigs by anova/tukey
 
+
+D35_tukeys %>% #filter(comparison != 'ther-sub') %>% 
+  ggplot(aes(x=genome, y=estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin=conf.low, ymax=conf.high), width=.2) + 
+  coord_flip() + geom_hline(yintercept = 0, color='red') + 
+  ggtitle('95% confidence intervals for the difference in growth rate between treatments',
+          'negative estimates indicate higher growth rate in ctrl, D35 only')+ facet_wrap(~comparison)
+
 # mixed model? not super confident about this.
-# no treatment effect detected
 summary(lmer(data = D35_treat_comp, formula = iRep ~ treatment + (1|genome)))
+
+# no treatment effect detectable at D35
+
+
 
 
 ###### Day 78 Diff BTWEEN GROUPS ######
-
+# only includes genomes with 4+ observations in all 3 treatment groups at D35
+# 8 genomes, 147 observations
 
 dat %>% filter(genome %in% D78$genome & day %in% c('78'))%>% 
   ggplot(aes(x=genome, y=iRep, fill=treatment)) + geom_boxplot() + geom_jitter(shape=21, position=position_dodge2(width = .75))
 
-# D78$genome
 
 D78_treat_comp <- dat %>% filter(genome %in% D78$genome & day %in% c('78'))
 
-
-# summary(lm(data=D78_treat_comp, formula = iRep ~ treatment + genome))
-# summary(lm(data=D78_treat_comp, formula = iRep ~ treatment * genome))
 
 
 D78_treat_comp %>% ggplot(aes(x=treatment, y=iRep, fill=treatment)) +
@@ -515,69 +528,80 @@ D78_treat_comp %>% ggplot(aes(x=treatment, y=iRep, fill=treatment)) +
   ggtitle('iRep growth rate estimates at D78') + theme_bw()
 
 
-D78_treat_comp %>% #filter(genome %in% D35$genome & day %in% c('35'))%>% 
+D78_treat_comp %>% 
   ggplot(aes(x=genome, y=iRep, fill=treatment)) + geom_boxplot() +
   geom_jitter(shape=21, position=position_dodge2(width = .75)) +
   ggtitle('iRep growth rate estimates at D78, by genome') + theme_bw()
 
 
-sigs <- D78_treat_comp %>% group_by(genome) %>% nest() %>% 
+D78_tukeys <- D78_treat_comp %>% group_by(genome) %>% nest() %>% 
   mutate(ANOVA=map(data, ~ aov(data=., iRep ~ treatment)), 
          tuk = map(ANOVA, TukeyHSD), 
          tid_tuk = map(tuk, tidy)) %>% 
   select(genome, tid_tuk) %>% 
   unnest(cols = tid_tuk) %>%
   mutate(tuk_pval = adj.p.value, 
-         fdr.pval = p.adjust(tuk_pval, method = 'fdr')) %>% 
+         fdr.pval = p.adjust(tuk_pval, method = 'fdr'))
+
+
+sigs <- D78_tukeys %>% 
   select(-adj.p.value) %>% filter(tuk_pval < 0.05)
 
 
-sigs
+D78_tukeys %>% filter(comparison != 'ther-sub') %>% 
+  ggplot(aes(x=genome, y=estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin=conf.low, ymax=conf.high), width=.2) + 
+  coord_flip() + geom_hline(yintercept = 0, color='red') + 
+  ggtitle('95% confidence intervals for the difference in growth rate between treatments',
+          'negative estimates indicate higher growth rate in ctrl, D35 only')+ facet_wrap(~comparison)
 
 
 
 # mixed model? not super confident about this.
-# no treatment effect detected
 summary(lmer(data = D78_treat_comp, formula = iRep ~ treatment + (1|genome)))
 # small treatment effect detected, both sub and ther, but at this timepoint they are receiving equal doses.
 
-
-
-
-
-
 ########### END TREATMENT EFFECT #########
 
+
+
+####### BEGIN TIME EFFECT ##########
+
+
+
 ### CONTROL ONLY DIFFERENCES BETWEEN GROWTH RATES AT D7 AND D35
+# only includes genomes with 4+ observations at both D7 and D35 in the control treatment only
+# 15 genomes 201 observations
 
-dat %>% filter(genome %in% ctrl735$genome & day %in% c('07', '35'))%>% 
-  ggplot(aes(x=genome, y=iRep, fill=day)) + geom_boxplot() 
+dat %>% filter(genome %in% ctrl735$genome & day %in% c('07', '35')& treatment == 'ctrl')%>% 
+  ggplot(aes(x=day, y=iRep, fill=day)) +
+  geom_violin() +
+  ggtitle('iRep estimates at D7 and D35, control only', '15 genomes, 201 observations')
 
+# looks to be a trend to higher growth rates in d7 communities
 
-dat %>% filter(genome %in% ctrl735$genome & day %in% c('07', '35'))%>% 
-  ggplot(aes(x=day, y=iRep, fill=day)) + geom_violin() 
+dat %>% filter(genome %in% ctrl735$genome & day %in% c('07', '35') & treatment == 'ctrl')%>% 
+  ggplot(aes(x=genome, y=iRep, fill=day)) + geom_boxplot() +
+  ggtitle('iRep estimates at D7 and D35, control only', '15 genomes, 201 observations')
 
-
-ctrl735_dat <- dat %>% filter(genome %in% ctrl735$genome & day %in% c('07', '35'))
-
-summary(lm(data=ctrl735_dat, formula = iRep ~ day+genome))
-summary(lmer(data = ctrl735_dat, formula = iRep ~ day + (1|genome)))
+ctrl735_dat <- dat %>% filter(genome %in% ctrl735$genome & day %in% c('07', '35')& treatment == 'ctrl')
 
 ctrl735_tests <- dat %>% 
-  filter(genome %in% ctrl735$genome & day %in% c('07', '35')) %>%
+  filter(genome %in% ctrl735$genome & day %in% c('07', '35')& treatment == 'ctrl') %>%
   group_by(genome) %>%
   nest()
 
 
 # fit a simple linear model on each genome
-ctrl735_lms <- ctrl735_tests %>% mutate(lms=map(data, ~ lm(data=. , formula = iRep ~ day)), 
-                       tid_sum = map(lms, tidy)) %>% select(genome, tid_sum) %>% 
-  unnest(cols = c('tid_sum'))#%>% filter(term == 'day35' & p.value < 0.05)
+# ctrl735_lms <- ctrl735_tests %>% mutate(lms=map(data, ~ lm(data=. , formula = iRep ~ day)), 
+#                        tid_sum = map(lms, tidy)) %>% select(genome, tid_sum) %>% 
+#   unnest(cols = c('tid_sum'))#%>% filter(term == 'day35' & p.value < 0.05)
+# 
+# ctrl735_lms %>%
+#   filter(term == 'day35' & p.value < 0.05)
 
-ctrl735_lms %>%
-  filter(term == 'day35' & p.value < 0.05)
-
-# Of the 15 genomes, there is evidence that 4 of them have lower growth rates at d35 relative to D7
+# Of the 15 genomes, there is evidence that 5 of them have lower growth rates at d35 relative to D7
 
 
 # ANOVA for each genome
@@ -593,7 +617,7 @@ ctrl735_tuk <- ctrl735_tests %>%
   select(-adj.p.value) #%>% filter(tuk_pval < 0.05)
 
 ctrl735_tuk %>% 
-  filter(term == 'day35' & p.value < 0.05)
+  filter(tuk_pval < 0.05)
 
 
 ctrl735_tuk %>%
@@ -601,14 +625,151 @@ ctrl735_tuk %>%
   geom_point() +
   geom_errorbar(aes(ymin=conf.low, ymax=conf.high), width=.2) + 
   coord_flip() + geom_hline(yintercept = 0, color='red') + 
-  ggtitle('95% confidence intervals fo difference in growth rate between D7 and D35',
-          'Control treatment only')
+  ggtitle('95% confidence intervals for the difference in growth rate between D7 and D35',
+          'negative estimates indicate higher growth rate at D7, Control treatment only')
+
+summary(lmer(data = ctrl735_dat, formula = iRep ~ day + (1|genome)))
+
+# Time effect detectable in the control group.  Lower growth-rate at D35 compared to D7 
+
+
+### SUBTHER ONLY DIFFERENCES BETWEEN GROWTH RATES AT D7 AND D35
+# only includes genomes with 4+ observations at both D7 and D35 in the control treatment only
+# 8 genomes 94 observations
+dat %>% filter(genome %in% sub735$genome & day %in% c('07', '35')& treatment == 'sub')%>% 
+  ggplot(aes(x=genome, y=iRep, fill=day)) + geom_boxplot() +
+  ggtitle('iRep estimates at D7 and D35, sub only', '8 genomes, 94 observations')
+
+
+dat %>% filter(genome %in% sub735$genome & day %in% c('07', '35')& treatment == 'sub')%>% 
+  ggplot(aes(x=day, y=iRep, fill=day)) + geom_violin() +
+  ggtitle('iRep estimates at D7 and D35, sub only', '8 genomes, 94 observations')
+
+# dat$treatment
+sub735_dat <- dat %>% filter(genome %in% sub735$genome & day %in% c('07', '35')& treatment == 'sub')
+
+
+sub735_tests <- dat %>% 
+  filter(genome %in% sub735$genome & day %in% c('07', '35')& treatment == 'sub') %>%
+  group_by(genome) %>%
+  nest()
+
+
+# ANOVA for each genome
+
+sub735_tuk <- sub735_tests %>% 
+  mutate(ANOVA=map(data, ~ aov(data=., iRep ~ day)), 
+         tuk = map(ANOVA, TukeyHSD), 
+         tid_tuk = map(tuk, tidy)) %>% 
+  select(genome, tid_tuk) %>% 
+  unnest(cols = tid_tuk) %>%
+  mutate(tuk_pval = adj.p.value, 
+         fdr.pval = p.adjust(tuk_pval, method = 'fdr')) %>% 
+  select(-adj.p.value) #%>% filter(tuk_pval < 0.05)
+
+sub735_tuk %>% 
+  filter(tuk_pval < 0.05)
+
+
+sub735_tuk %>%
+  ggplot(aes(x=genome, y=estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin=conf.low, ymax=conf.high), width=.2) + 
+  coord_flip() + geom_hline(yintercept = 0, color='red') + 
+  ggtitle('95% confidence intervals for the difference in growth rate between D7 and D35',
+          'negative estimates indicate higher growth rate at D7, Control treatment only')
+
+summary(lmer(data = sub735_dat, formula = iRep ~ day + (1|genome)))
+
+# Time effect detectable in the sub group.  Lower growth-rate at D35 compared to D7 
+
+
+### THER ONLY DIFFERENCES BETWEEN GROWTH RATES AT D7 AND D35
+# only includes genomes with 4+ observations at both D7 and D35 in the control treatment only
+# 11 genomes 131 observations
+
+dat %>% filter(genome %in% ther735$genome & day %in% c('07', '35')& treatment == 'ther')%>% 
+  ggplot(aes(x=genome, y=iRep, fill=day)) + geom_boxplot() +
+  ggtitle('iRep estimates at D7 and D35, ther only', '11 genomes, 131 observations')
+
+
+
+dat %>% filter(genome %in% ther735$genome & day %in% c('07', '35')& treatment == 'ther')%>% 
+  ggplot(aes(x=day, y=iRep, fill=day)) + geom_violin() +
+  ggtitle('iRep estimates at D7 and D35, ther only', '11 genomes, 131 observations')
+
+
+# dat$treatment
+ther735_dat <- dat %>% filter(genome %in% ther735$genome & day %in% c('07', '35')& treatment == 'ther')
+
+
+ther735_tests <- dat %>% 
+  filter(genome %in% ther735$genome & day %in% c('07', '35')& treatment == 'ther') %>%
+  group_by(genome) %>%
+  nest()
+
+
+
+# ANOVA for each genome
+
+ther735_tuk <- ther735_tests %>% 
+  mutate(ANOVA=map(data, ~ aov(data=., iRep ~ day)), 
+         tuk = map(ANOVA, TukeyHSD), 
+         tid_tuk = map(tuk, tidy)) %>% 
+  select(genome, tid_tuk) %>% 
+  unnest(cols = tid_tuk) %>%
+  mutate(tuk_pval = adj.p.value, 
+         fdr.pval = p.adjust(tuk_pval, method = 'fdr')) %>% 
+  select(-adj.p.value) #%>% filter(tuk_pval < 0.05)
+
+ther735_tuk %>% 
+  filter(tuk_pval < 0.05)
+
+# Of the 11 genomes, there is evidence that 0 of them have lower growth rates at d35 relative to D7
+
+
+
+ther735_tuk %>%
+  ggplot(aes(x=genome, y=estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin=conf.low, ymax=conf.high), width=.2) + 
+  coord_flip() + geom_hline(yintercept = 0, color='red') + 
+  ggtitle('95% confidence intervals for the difference in growth rate between D7 and D35',
+          'negative estimates indicate higher growth rate at D7, Therapeutic treatment only')
+
+summary(lmer(data = ther735_dat, formula = iRep ~ day + (1|genome)))
+
+
+# No time effect in ther
+
+
+
 
 
 
 
 
 ############ DUMP BELOW HERE #########
+# these are all half baked (or unbaked) ideas,  dont look at them.
+
+
+ctrl_735_lmod <- lmer(data = ctrl735_dat, formula = iRep ~ day + (1|genome))
+summary(ctrl_735_lmod)
+confint(ctrl_735_lmod)
+lme4::ranef(ctrl_735_lmod)
+
+
+sub_735_lmod <- lmer(data = sub735_dat, formula = iRep ~ day + (1|genome))
+summary(sub_735_lmod)
+confint(sub_735_lmod)
+lme4::ranef(sub_735_lmod)
+
+
+ther_735_lmod <- lmer(data = ther735_dat, formula = iRep ~ day + (1|genome))
+summary(sub_735_lmod)
+confint(sub_735_lmod)
+lme4::ranef(sub_735_lmod)
+
 
 ######### From above ########
 
