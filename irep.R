@@ -9,8 +9,9 @@ colnams <- c('bin', 'marker_lineage', 'num_genomes', 'num_markers', 'num_marker_
 checkm <- read_delim('CheckM_clean3.txt', delim = '\t', trim_ws = TRUE, skip = 2, col_names = colnams) %>%
   mutate(bin=sub('_new', '', bin)) 
 
+dat$sample
 
-
+'d78ex3sub'
 # read in the data and extract some metadata from sample names
 dat <- read_tsv('ALL_RESULTS_BULK_MAP.txt', skip = 1, col_types = c('iccnnnnnnninn'))%>%
   mutate(sample = sub('_mapped.sam','',sample),
@@ -21,7 +22,7 @@ dat <- read_tsv('ALL_RESULTS_BULK_MAP.txt', skip = 1, col_types = c('iccnnnnnnni
          day_num = as.numeric(day))  %>% 
   filter(!(is.na(iRep))) %>%
   filter(!grepl('ex', sample)) %>% 
-  select(-X1, -`fragments/Mbp`)
+  select(-...1, -`fragments/Mbp`)
 
 
 dat <- dat %>% filter(coverage > 5)  # only keep estimates from samples where bins had > 5x coverage (as reccommended)
@@ -81,21 +82,27 @@ valid_irep_totbin %>%
   ggtitle('number of valid iRep estimates per bin') + 
   theme_bw()
 
+# KEEP ONLY ESTIMATES FROM BINS THAT WERE OBSERVED AT LEAST 3 TIMES
 goodbins <- valid_irep_totbin %>% filter(n >2) %>% pull(genome)
 
 
 dat_QC <- dat %>% filter(genome %in% goodbins)
 dat_QC %>% nrow()
 
+dat_QC |> write_tsv('iRep_estimates_QCd.tsv')
+
+colnames(dat_QC)
+
+
 # 2179 iRep estimates removing bins with fewer than 3 observations
 
 
 dat %>% nrow()
 # 2278 valid iRep estimates
-
-dat_QC
-mod <- lmer(data=dat_QC, formula = iRep ~ treatment * day + (1|genome))
-summary(mod)
+# 
+# dat_QC
+# mod <- lmer(data=dat_QC, formula = iRep ~ treatment * day + (1|genome))
+# summary(mod)
 
 
 # compare treatment effects at each day
