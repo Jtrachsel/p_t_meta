@@ -25,7 +25,7 @@ dat <- read_tsv('ALL_RESULTS_BULK_MAP.txt', skip = 1, col_types = c('iccnnnnnnni
 
 
 dat <- dat %>% filter(coverage > 5)  # only keep estimates from samples where bins had > 5x coverage (as reccommended)
-
+colnames(dat)
 # Histogram of all iRep estimates
 dat %>% ggplot(aes(x=iRep)) +
   geom_histogram(bins = 50) +
@@ -81,9 +81,28 @@ valid_irep_totbin %>%
   ggtitle('number of valid iRep estimates per bin') + 
   theme_bw()
 
+goodbins <- valid_irep_totbin %>% filter(n >2) %>% pull(genome)
+
+
+dat_QC <- dat %>% filter(genome %in% goodbins)
+dat_QC %>% nrow()
+
+# 2179 iRep estimates removing bins with fewer than 3 observations
+
 
 dat %>% nrow()
 # 2278 valid iRep estimates
+
+dat_QC
+mod <- lmer(data=dat_QC, formula = iRep ~ treatment * day + (1|genome))
+summary(mod)
+
+
+# compare treatment effects at each day
+emmeans::emmeans()
+
+# compare time effect within each treatment
+emmeans::emmeans()
 
 dat %>% select(genome) %>% unlist() %>% unique() %>% length()
 # from 244 genomes
@@ -395,13 +414,18 @@ dat %>% unite(col = 'bin_day', genome, day, remove = FALSE) %>%
 dat %>% filter(genome %in% D7$genome & day %in% c('07'))%>% 
   ggplot(aes(x=treatment, y=iRep, fill=treatment)) + geom_violin() + geom_jitter(shape=21, width = .2)+
   ggtitle('iRep growth rate estimates at D7', '') + theme_bw() +
-  stat_summary(fun.y = "mean", colour = "black", size = 2, geom = "point")
+  stat_summary(fun.y = "mean", colour = "black", size = 2, geom = "point") + 
+  ylab('iRep estimated growth rate')
+ggsave('D7_aggregate_growth_rate.jpg')
 
 dat %>% filter(genome %in% D7$genome & day %in% c('07'))%>% 
   ggplot(aes(x=genome, y=iRep, fill=treatment)) +
   geom_boxplot() +
   geom_jitter(shape=21, position=position_dodge2(width = .75)) + 
-  ggtitle('iRep growth rate estimates at D7') + theme_bw()
+  ggtitle('iRep growth rate estimates at D7') + theme_bw()+
+  ylab('iRep estimated growth rate')
+
+ggsave('D7_individual_bins_growth_rate.jpg')
 
 
 D7_treat_comp <- dat %>% filter(genome %in% D7$genome & day %in% c('07'))
@@ -450,12 +474,12 @@ D7_tukeys %>% #filter(comparison != 'ther-sub') %>%
   geom_errorbar(aes(ymin=conf.low, ymax=conf.high), width=.2) + 
   coord_flip() + geom_hline(yintercept = 0, color='red') + 
   ggtitle('95% confidence intervals for the difference in growth rate between treatments',
-          'negative estimates indicate higher growth rate in ctrl, D7 only')+ facet_wrap(~comparison)
+          'negative estimates indicate higher growth rate in ctrl, D7 only')+ facet_wrap(~contrast)
 
 # mixed model? not super confident about this.
 summary(lmer(data = D7_treat_comp, formula = iRep ~ treatment + (1|genome)))
 checkm %>% filter(bin %in% sigs$genome) %>% select(bin, marker_lineage, Completeness, Contamination)
-
+d
 
 
 
